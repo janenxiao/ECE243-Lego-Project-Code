@@ -19,16 +19,16 @@ song1:	# first hword is number of steps to go, next is direction (right is 1, le
 	.hword 2, 1  	# 3
 	.hword 1, -1	# 2
 	.hword 1, -1	# 1
-	.hword 1, 1		# 2
-	.hword 1, 1		# 3
-	.hword 0, 1		# 3
-	.hword 0, 1		# 3
+	.hword 1, 1	# 2
+	.hword 1, 1	# 3
+	.hword 0, 1	# 3
+	.hword 0, 1	# 3
 	.hword 1, -1	# 2
-	.hword 0, 1		# 2
-	.hword 0, 1		# 2
-	.hword 1, 1		# 3
-	.hword 2, 1		# 5
-	.hword 0, 1		# 5
+	.hword 0, 1	# 2
+	.hword 0, 1	# 2
+	.hword 1, 1	# 3
+	.hword 2, 1	# 5
+	.hword 0, 1	# 5
 	.word 0
 	
 keys_makecode:
@@ -491,40 +491,68 @@ move_steps:
 		ret	# return to get the next move_instructions
 		
 move_mallet:
-	subi sp, sp, 4*4
+	subi sp, sp, 4*5
 	stwio ra, 0(sp)
 	stwio r9, 4(sp)
 	stwio r4, 8(sp)
 	stwio r5, 12(sp)
+	stwio r10, 16(sp)
 
 	movia r8, ADDR_JP1
 	
 	movia r9, 0x07F557FF	#set direction to all output
 	stwio r9, 4(r8)
+	
+	# pulse width modulation to move mallet
+	movi r10, 10000		# counter for how long motor1 is run downward
+	loop_motor1_down:
+		beq r10,r0,motor1_up
+		subi r10,r10,1
+		
+		movia r9, 0xFFFEFFF3	#motor1 enabled (bit 0=0), direction set to forward (bit1 =0) # mallet moves down to hit key
+		stwio r9, 0(r8)
 
-	movia r9, 0xFFFEFFF3	#motor1 enabled (bit 0=0), direction set to forward (bit1 =0) # mallet moves down to hit key
-	stwio r9, 0(r8)
+		movi r4, %lo(1200)
+		movi r5, %hi(1200)
+		call timer
+		
+		movia r9, 0xFFFEFFFF	#motor1 disabled (bit 0=0), direction set to forward (bit1 =0)
+		stwio r9, 0(r8)	
+		
+		movi r4, %lo(1200)
+		movi r5, %hi(1200)
+		call timer
+		br loop_motor1_down
+	
+	motor1_up:
+	movi r10, 10000		# counter for how long motor1 is run upward
+	loop_motor1_up:
+		beq r10,r0,exit_move_mallet
+		subi r10,r10,1
+		
+		movia r9, 0xFFFEFFFB	#motor1 enabled (bit 0=0), direction set to reverse (bit1 =1) # mallet moves up to initial position
+		stwio r9, 0(r8)	
 
-	movi r4, %lo(12000000)
-	movi r5, %hi(12000000)
-	call timer
+		movi r4, %lo(850)
+		movi r5, %hi(850)
+		call timer
 
-	movia r9, 0xFFFEFFFB	#motor1 enabled (bit 0=0), direction set to reverse (bit1 =1) # mallet moves up to initial position
-	stwio r9, 0(r8)	
+		movia r9, 0xFFFEFFFF	#motor1 disabled (bit 0=0), direction set to forward (bit1 =0)
+		stwio r9, 0(r8)	
+		
+		movi r4, %lo(850)
+		movi r5, %hi(850)
+		call timer
+		br loop_motor1_up
 
-	movi r4, %lo(8500000)
-	movi r5, %hi(8500000)
-	call timer
-
-	movia r9, 0xFFFEFFFF	#motor1 disabled (bit 0=0), direction set to forward (bit1 =0)
-	stwio r9, 0(r8)	
-
-	ldwio ra, 0(sp)
-	ldwio r9, 4(sp)
-	ldwio r4, 8(sp)
-	ldwio r5, 12(sp)
-	addi sp, sp, 4*4
-	ret
+	exit_move_mallet:
+		ldwio ra, 0(sp)
+		ldwio r9, 4(sp)
+		ldwio r4, 8(sp)
+		ldwio r5, 12(sp)
+		ldwio r10, 16(sp)
+		addi sp, sp, 4*5
+		ret
 
 timer:
 	# save registers used in this subroutine
